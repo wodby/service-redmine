@@ -25,7 +25,9 @@ set in Redmine under Administration › Settings.
   sent over HTTPS only.
 - **Email.** With a mail server linked as `sendmail`, `SMTP_HOST` and `SMTP_PORT` become Redmine's SMTP server, without
   STARTTLS. Without one Redmine sends no email; set `SMTP_*` variables for another server (see the
-  [wodby/redmine](https://github.com/wodby/redmine) README). Emails are sent in the background by the web process.
+  [wodby/redmine](https://github.com/wodby/redmine) README). Emails are sent during the request that causes them
+  (`REDMINE_QUEUE_ADAPTER=inline`), so a restart never loses one; a failed delivery is logged and the request still
+  succeeds.
 
 ## Installation and upgrades
 
