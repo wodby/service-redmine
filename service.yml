@@ -1,0 +1,238 @@
+name: redmine
+type: service
+icon: redmine
+title: Redmine
+scalable: true
+guidance: GUIDANCE.md
+
+labels:
+- redmine
+
+# Redmine's fully supported release line and the previous one, which still
+# gets security and bug fixes.
+options:
+- version: '7.0'
+  default: true
+  tag: 7.0-r0
+- version: '6.1'
+  tag: 6.1-r0
+
+endpoints:
+- name: redmine
+  ports:
+  - name: http
+    number: 3000
+    protocol: http
+    main: true
+    routeDefaults:
+      https_redirect: 'true'
+
+links:
+- name: db
+  title: PostgreSQL
+  required: true
+  # A managed database server's CA certificate, mounted when the server has one, so Redmine verifies it over TLS.
+  database:
+    ca:
+      filepath: /etc/wodby/db/ca.pem
+  env:
+  - name: DB_HOST
+    value: '{{link.database.host}}'
+  - name: DB_PORT
+    value: '{{link.database.port}}'
+  - name: DB_NAME
+    value: '{{link.database.db.name}}'
+  - name: DB_USER
+    value: '{{link.database.user.name}}'
+  - name: DB_PASSWORD
+    value: '{{link.database.user.password}}'
+    secret: true
+  # The path of the server's CA certificate when it has one, otherwise empty.
+  - name: DB_SSL_CA
+    value: '{{link.database.caFile}}'
+  selectors:
+  - type: db
+    labels:
+    - postgres
+- name: files
+  title: Attachment storage
+  required: true
+  selectors:
+  - type: storage
+- name: sendmail
+  title: SMTP server
+  required: false
+  env:
+  - name: SMTP_HOST
+    value: '{{link.host}}'
+  - name: SMTP_PORT
+    value: '{{link.port}}'
+  # The relay in the cluster accepts mail without TLS.
+  - name: SMTP_STARTTLS
+    value: 'false'
+  selectors:
+  - type: service
+    labels:
+    - smtpd
+
+# Attachments. Every replica reads and writes the same files, so the volume is
+# shared.
+volumes:
+- name: files
+  title: Attachments
+  link: files
+  shared: true
+  size: 10
+  path: /mnt/files
+  import:
+    owner: 1000
+    group: 1000
+
+settings:
+# The administrator the first deployment sets up in place of Redmine's stock
+# admin/admin account.
+- name: admin-login
+  title: Admin login
+  description: Login of the Redmine administrator set up on the first deployment.
+  default: admin
+  var: REDMINE_ADMIN_LOGIN
+- name: admin-password
+  title: Admin password
+  description: Password of the Redmine administrator set up on the first deployment, at least 8 characters. Change it in Redmine afterwards; this setting is not used again.
+  required: true
+  secret: true
+  var: REDMINE_ADMIN_PASSWORD
+- name: admin-email
+  title: Admin email
+  description: Email address of the Redmine administrator.
+  var: REDMINE_ADMIN_EMAIL
+- name: language
+  title: Language
+  description: Language of the default trackers, statuses and roles loaded on the first deployment and of the administrator, such as de or pt-BR.
+  default: en
+  var: REDMINE_LANG
+- name: workers
+  title: Workers
+  description: Puma worker processes per replica, each with 5 threads. Each uses about 150 MB of memory.
+  default: '2'
+  var: WEB_CONCURRENCY
+
+env:
+# Signs sessions and cookies.
+- name: SECRET_KEY_BASE
+  value: '{{secret_key_base}}'
+  secret: true
+# The sender of Redmine's emails on the first deployment; it can be changed in
+# Redmine later.
+- name: REDMINE_MAIL_FROM
+  value: 'noreply@{{service.primaryHost}}'
+# Routes redirect to HTTPS.
+- name: REDMINE_AUTOLOGIN_COOKIE_SECURE
+  value: 'true'
+
+tokens:
+- name: secret_key_base
+  generate:
+    regex: '[0-9a-f]{128}'
+
+actions:
+# Installs Redmine on the first deployment and runs the core and plugin
+# migrations on every deployment.
+- name: update
+  title: Install or upgrade Redmine
+  args:
+  - redmine-update
+  type: post_deploy
+
+deployment:
+  strategy: rolling
+  maxUnavailable: 0
+  maxSurge: 1
+  minReady: 10s
+  progressDeadline: 10m
+  # Puma finishes its current requests.
+  shutdownGracePeriod: 30s
+
+helm:
+  name: wodby
+  source: oci://registry-1.docker.io/wodby/stateless
+  chart: oci://registry-1.docker.io/wodby/stateless
+  version: 0.4.0
+  valueMappings:
+    replicas: replicaCount
+    serviceAccountName: serviceAccount.name
+    serviceAccountCreate: serviceAccount.create
+  values:
+  - name: containerName
+    value: redmine
+  - name: containerPorts
+    value:
+    - name: http
+      containerPort: 3000
+      protocol: TCP
+  - name: podSecurityContext
+    value:
+      fsGroup: 1000
+      fsGroupChangePolicy: OnRootMismatch
+  # /-/health answers once Redmine has booted, without the database, so the
+  # first deployment is ready before the install action creates the tables.
+  - name: startupProbe
+    value:
+      httpGet:
+        path: /-/health
+        port: http
+      failureThreshold: 60
+      periodSeconds: 5
+      timeoutSeconds: 5
+  - name: readinessProbe
+    value:
+      httpGet:
+        path: /-/health
+        port: http
+      failureThreshold: 3
+      periodSeconds: 10
+      timeoutSeconds: 5
+  - name: livenessProbe
+    value:
+      httpGet:
+        path: /-/health
+        port: http
+      failureThreshold: 6
+      periodSeconds: 20
+      timeoutSeconds: 10
+
+workloads:
+- name: main
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: '{{helm.release}}'
+  kind: deployment
+  primary: true
+  helm:
+    labels: podLabels
+    annotations: podAnnotations
+    volumes: extraVolumes
+  containers:
+  - name: redmine
+    image: wodby/redmine
+    # A prebuilt image, so Wodby passes the app's addresses only on request.
+    # The first deployment sets Redmine's host name from WODBY_PRIMARY_URL.
+    routeMetadata: true
+    resources:
+      request:
+        cpu: 10
+        memory: 448
+      limit:
+        cpu: 2000
+        memory: 1536
+    helm:
+      resources: resources
+      env: envVars
+      mounts: extraVolumeMounts
+      image:
+        repository: image.repository
+        tag: image.tag
+        registry: image.registry
+        pullPolicy: image.pullPolicy
+
+workspace: false
