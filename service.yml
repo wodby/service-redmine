@@ -13,9 +13,9 @@ labels:
 options:
 - version: '7.0'
   default: true
-  tag: 7.0-r0
+  tag: 7.0-r1
 - version: '6.1'
-  tag: 6.1-r0
+  tag: 6.1-r1
 
 endpoints:
 - name: redmine
