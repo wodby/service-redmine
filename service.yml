@@ -14,9 +14,11 @@ options:
 - version: '7.0'
   default: true
   tag: 7.0-r1
+  digest: sha256:a052351abdfb34a667eb5feb8ebc42f19fcc7fed0f17395042d7fd6d3833c463
 - version: '6.1'
   tag: 6.1-r1
 
+  digest: sha256:98b01189fb3e8ed1fdea42366c289086571122e4e4f488486a2020cea7136bc7
 endpoints:
 - name: redmine
   ports:
