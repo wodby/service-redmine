@@ -139,12 +139,13 @@ tokens:
 
 actions:
 # Installs Redmine on the first deployment and runs the core and plugin
-# migrations on every deployment.
+# migrations on every deployment, before the new version rolls out, while
+# the previous version keeps serving.
 - name: update
   title: Install or upgrade Redmine
   args:
   - redmine-update
-  type: post_deploy
+  type: pre_deploy
 
 deployment:
   strategy: rolling
