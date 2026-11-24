@@ -31,8 +31,10 @@ set in Redmine under Administration › Settings.
 
 ## Installation and upgrades
 
-After every deployment the **Install or upgrade Redmine** action (`redmine-update`) runs the core and plugin
-migrations, then:
+On every deployment the **Install or upgrade Redmine** action (`redmine-update`) runs the core and plugin migrations in
+a job of the new version, before its pods are replaced; on the first deployment, right after the install. If it fails,
+the deployment stops before the rollout, and the previous version keeps serving on the migrated database until the new
+one is ready. Then:
 
 - **First deployment:** loads Redmine's default trackers, statuses, roles and workflows in the `language` setting
   (default `en`), and replaces Redmine's stock `admin`/`admin` account with the `admin-login` (default `admin`),
@@ -57,5 +59,5 @@ Redmine has no background workers or scheduled jobs on this service. Redmine's o
 ## Check the result
 
 - `curl -s localhost:3000/-/health` in the container returns `OK`.
-- The deployment's post-deploy log shows lines starting with `[redmine-update]`.
+- The deployment's log shows lines starting with `[redmine-update]`.
 - `bin/rails console` opens a Rails console in `/usr/src/redmine`.
