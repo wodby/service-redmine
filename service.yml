@@ -13,12 +13,12 @@ labels:
 options:
 - version: '7.0'
   default: true
-  tag: 7.0-r1
-  digest: sha256:a052351abdfb34a667eb5feb8ebc42f19fcc7fed0f17395042d7fd6d3833c463
+  tag: 7.0-r3
+  digest: sha256:8407f350fe525d99dd83c8d0bbd909aa35b868bb8e6add4fda4428f3b4d1c479
 - version: '6.1'
-  tag: 6.1-r1
+  tag: 6.1-r3
 
-  digest: sha256:98b01189fb3e8ed1fdea42366c289086571122e4e4f488486a2020cea7136bc7
+  digest: sha256:c0ad21ad0dd696da4038f293b7fe035fa05cd056c83cbc63312752885694672e
 endpoints:
 - name: redmine
   ports:
